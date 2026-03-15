@@ -1,6 +1,5 @@
 from copy import deepcopy
 import time
-
 import tyro
 
 from decoupled_wbc.control.envs.g1.g1_env import G1Env

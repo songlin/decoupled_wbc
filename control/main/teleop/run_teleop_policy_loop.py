@@ -83,8 +83,8 @@ def main(config: TeleopConfig):
                     data["target_time"] = t_now + (1 / config.teleop_frequency)
 
                 # Debug: log base height command from pico
-                if "base_height_command" in data:
-                    print(f"[teleop] base_height_command: {data['base_height_command']}")
+                # if "base_height_command" in data:
+                #     print(f"[teleop] base_height_command: {data['base_height_command']}")
 
                 # Publish the teleop command
                 with telemetry.timer("publish_teleop_command"):
