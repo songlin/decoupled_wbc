@@ -11,12 +11,12 @@ import datasets
 from datasets import load_dataset
 from datasets.utils import disable_progress_bars
 from huggingface_hub.errors import RepositoryNotFoundError
-from lerobot.common.datasets.lerobot_dataset import (
+from lerobot.datasets.lerobot_dataset import (
     LeRobotDataset,
     LeRobotDatasetMetadata,
     compute_episode_stats,
 )
-from lerobot.common.datasets.utils import (
+from lerobot.datasets.utils import (
     check_timestamps_sync,
     get_episode_data_index,
     validate_episode_buffer,
@@ -223,7 +223,7 @@ class Gr00tDataExporter(LeRobotDataset):
                 fps=fps,
                 root=save_root,
                 # NOTE(fengyuanh): We use "robot_type" instead of this field which requires a Robot object
-                robot=None,
+                # robot=None,
                 robot_type=robot_type,
                 features=features,
                 modality_config=modality_config,
@@ -274,14 +274,17 @@ class Gr00tDataExporter(LeRobotDataset):
         which uses a stream writer to write to disk.
         """
         frame = copy.deepcopy(frame)
-        frame["task"] = frame.get("task", self.task)
 
         # Convert torch to numpy if needed
         for name in frame:
             if isinstance(frame[name], torch.Tensor):
                 frame[name] = frame[name].numpy()
 
+        # Validate before adding "task" — lerobot's validate_frame rejects
+        # keys not present in features, and "task" is handled specially.
         validate_frame(frame, self.features)
+
+        frame["task"] = frame.get("task", self.task)
 
         if self.episode_buffer is None:
             self.episode_buffer = self.create_episode_buffer()

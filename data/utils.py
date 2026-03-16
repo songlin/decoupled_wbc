@@ -37,6 +37,15 @@ def get_modality_config(robot_model: RobotModel, add_stereo_camera: bool = False
                 "original_key": "observation.eef_state",
                 "rotation_type": "quaternion",
             },
+            "base_pos": {"start": 0, "end": 3, "original_key": "observation.base_pose"},
+            "base_quat": {
+                "start": 3,
+                "end": 7,
+                "original_key": "observation.base_pose",
+                "rotation_type": "quaternion",
+            },
+            "base_lin_vel": {"start": 0, "end": 3, "original_key": "observation.base_vel"},
+            "base_ang_vel": {"start": 3, "end": 6, "original_key": "observation.base_vel"},
         },
         "action": {
             "left_leg": {"start": left_leg_indices[0], "end": left_leg_indices[-1] + 1},
@@ -135,6 +144,16 @@ def get_dataset_features(robot_model: RobotModel, add_stereo_camera: bool = Fals
             "dtype": "float64",
             "shape": (1,),
             "names": "base_height_command",
+        },
+        "observation.base_pose": {
+            "dtype": "float64",
+            "shape": (7,),
+            "names": ["pos_x", "pos_y", "pos_z", "quat_w", "quat_x", "quat_y", "quat_z"],
+        },
+        "observation.base_vel": {
+            "dtype": "float64",
+            "shape": (6,),
+            "names": ["lin_vel_x", "lin_vel_y", "lin_vel_z", "ang_vel_x", "ang_vel_y", "ang_vel_z"],
         },
     }
     if add_stereo_camera:
