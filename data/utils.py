@@ -74,7 +74,7 @@ def get_modality_config(robot_model: RobotModel, add_stereo_camera: bool = False
                 "end": 1,
                 "original_key": "teleop.base_height_command",
             },
-            "navigate_command": {"start": 0, "end": 3, "original_key": "teleop.navigate_command"},
+            "navigate_command": {"start": 0, "end": 4, "original_key": "teleop.navigate_command"},
         },
         "video": {"ego_view": {"original_key": "observation.images.ego_view"}},
         "annotation": {"human.task_description": {"original_key": "task_index"}},
@@ -137,8 +137,8 @@ def get_dataset_features(robot_model: RobotModel, add_stereo_camera: bool = Fals
         },
         "teleop.navigate_command": {
             "dtype": "float64",
-            "shape": (3,),
-            "names": ["lin_vel_x", "lin_vel_y", "ang_vel_z"],
+            "shape": (4,),
+            "names": ["lin_vel_x", "lin_vel_y", "ang_vel_z", "target_yaw"],
         },
         "teleop.base_height_command": {
             "dtype": "float64",

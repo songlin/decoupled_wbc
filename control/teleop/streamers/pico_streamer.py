@@ -44,6 +44,7 @@ class PicoStreamer(BaseStreamer):
         self.toggle_activation_last = False
         self.toggle_data_collection_last = False
         self.toggle_data_abort_last = False
+        self.target_yaw = 0.0  # Integrated absolute target yaw angle
 
     def start_streaming(self):
         pass
@@ -121,7 +122,13 @@ class PicoStreamer(BaseStreamer):
 
         lin_vel_x = self._apply_dead_zone(fwd_bwd_input, DEAD_ZONE) * MAX_LINEAR_VEL
         lin_vel_y = self._apply_dead_zone(strafe_input, DEAD_ZONE) * MAX_LINEAR_VEL
-        ang_vel_z = self._apply_dead_zone(yaw_input, DEAD_ZONE) * MAX_ANGULAR_VEL
+
+        # Compute raw yaw angular velocity and integrate to produce absolute target yaw angle
+        _DT = 1.0 / 50.0  # fixed 50Hz call rate
+        vyaw = self._apply_dead_zone(yaw_input, DEAD_ZONE) * MAX_ANGULAR_VEL
+        self.target_yaw += vyaw * _DT
+        # Wrap to [-pi, pi]
+        self.target_yaw = np.arctan2(np.sin(self.target_yaw), np.cos(self.target_yaw))
 
         # Get base height command
         height_increment = 0.01  # Small step per call when button is pressed
@@ -180,7 +187,7 @@ class PicoStreamer(BaseStreamer):
             },
             control_data={
                 "base_height_command": self.current_base_height,
-                "navigate_cmd": [lin_vel_x, lin_vel_y, ang_vel_z],
+                "navigate_cmd": [lin_vel_x, lin_vel_y, vyaw, self.target_yaw],
                 "toggle_policy_action": toggle_policy_action,
             },
             teleop_data={

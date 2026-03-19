@@ -264,6 +264,11 @@ class PoseTrajectoryInterpolator:
         # determine speed
         duration = time - end_time
         end_pose = trimmed_interp(end_time)
+        # Enforce 4-element navigate_cmd structure (vx, vy, vyaw, target_yaw)
+        assert len(pose) == len(end_pose), (
+            f"Pose dimension mismatch: got {len(pose)}, expected {len(end_pose)}. "
+            f"Ensure all poses use 4-element navigate_cmd [vx, vy, vyaw, target_yaw]."
+        )
         pose_min_duration = np.max(np.abs(end_pose - pose) / max_change_rate)
         duration = max(duration, pose_min_duration)
         assert duration >= 0

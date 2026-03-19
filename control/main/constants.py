@@ -9,7 +9,7 @@ LOWER_BODY_POLICY_STATUS_TOPIC = "ControlPolicy/lower_body_policy_status"
 JOINT_SAFETY_STATUS_TOPIC = "ControlPolicy/joint_safety_status"
 
 
-DEFAULT_NAV_CMD = [0.0, 0.0, 0.0]
+DEFAULT_NAV_CMD = [0.0, 0.0, 0.0, 0.0]
 DEFAULT_BASE_HEIGHT = 0.74
 DEFAULT_WRIST_POSE = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0] * 2  # x, y, z + w, x, y, z
 

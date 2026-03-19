@@ -279,6 +279,8 @@ class JoyconStreamer(BaseStreamer):
         self.current_base_height = 0.74  # Initial base height, 0.74m (standing height)
         self.stand_toggle_cooldown = 0.5  # prevent rapid stand toggling
         self.last_stand_toggle_time = 0
+        self.target_yaw = 0.0  # Integrated absolute target yaw angle
+        self.last_time = time.time()  # Track time for dt calculation
 
     def start_streaming(self):
         """Start streaming from Joy-Con devices."""
@@ -491,7 +493,15 @@ class JoyconStreamer(BaseStreamer):
 
         lin_vel_x = self._apply_dead_zone(fwd_bwd_input, DEAD_ZONE) * MAX_LINEAR_VEL
         lin_vel_y = self._apply_dead_zone(strafe_input, DEAD_ZONE) * MAX_LINEAR_VEL  # Strafe
-        ang_vel_z = self._apply_dead_zone(yaw_input, DEAD_ZONE) * MAX_ANGULAR_VEL
+
+        # Compute raw yaw angular velocity and integrate to produce absolute target yaw angle
+        current_time = time.time()
+        dt = current_time - self.last_time
+        self.last_time = current_time
+        vyaw = self._apply_dead_zone(yaw_input, DEAD_ZONE) * MAX_ANGULAR_VEL
+        self.target_yaw += vyaw * dt
+        # Wrap to [-pi, pi]
+        self.target_yaw = np.arctan2(np.sin(self.target_yaw), np.cos(self.target_yaw))
 
         # Extract home button press event for toggle activation
         right_button_events = joycon_data.get("right_button_events", {})
@@ -512,7 +522,7 @@ class JoyconStreamer(BaseStreamer):
             },
             control_data={
                 "base_height_command": self.current_base_height,
-                "navigate_cmd": [lin_vel_x, lin_vel_y, ang_vel_z],
+                "navigate_cmd": [lin_vel_x, lin_vel_y, vyaw, self.target_yaw],
                 "toggle_stand_command": self._detect_stand_toggle(joycon_data),
                 "toggle_policy_action": self._detect_locomotion_policy_toggle(joycon_data),
             },

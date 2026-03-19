@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 import onnxruntime as ort
 import torch
+from scipy.spatial.transform import Rotation as R
 
 from decoupled_wbc.control.base.policy import Policy
 from decoupled_wbc.control.utils.gear_wbc_utils import get_gravity_orientation, load_config
@@ -51,6 +52,7 @@ class G1GearWbcPolicy(Policy):
         self.pitch_cmd = self.config["rpy_cmd"][1]
         self.yaw_cmd = self.config["rpy_cmd"][2]
         self.gait_indices = torch.zeros((1), dtype=torch.float32)
+        # self.control_dt = 1.0 / 50.0  # Control frequency at 50Hz
 
     def load_onnx_policy(self, model_path: str):
         print(f"Loading ONNX policy from {model_path}")
@@ -210,7 +212,31 @@ class G1GearWbcPolicy(Policy):
             )
 
         if interpolated_navigate_cmd is not None and self.use_teleop_policy_cmd:
-            self.cmd = interpolated_navigate_cmd
+            self.cmd[0:2] = interpolated_navigate_cmd[0:2]  # vx, vy unchanged
+            vyaw_flag = interpolated_navigate_cmd[2]  # Turning flag (raw controller input)
+            target_yaw = interpolated_navigate_cmd[3]  # Integrated target yaw
+
+            # Extract current yaw from base quaternion using scipy
+            quat_raw = self.observation["floating_base_pose"][3:7]
+            quat = np.array([quat_raw[1], quat_raw[2], quat_raw[3], quat_raw[0]])  # Reorder to [x, y, z, w]
+            rot = R.from_quat(quat)
+            current_yaw = rot.as_euler("xyz")[2]  # Extract yaw (Z-axis rotation)
+
+            # Compute yaw error with wrap-around
+            yaw_error = np.arctan2(np.sin(target_yaw - current_yaw), np.cos(target_yaw - current_yaw))
+
+            # Dead zone: if error is small enough, stop correcting
+            YAW_ERROR_THRESHOLD = 0.01  # ~0.57 degrees
+            if abs(yaw_error) < YAW_ERROR_THRESHOLD : # or abs(vyaw_flag) == 0.0
+                vyaw = 0.0
+            else:
+                vyaw = yaw_error / 0.5  # convert error to rate
+                # Clamp to max angular velocity used by streamers
+                MAX_ANGULAR_VEL = 1.0  # rad/s (matches pico_streamer.py)
+                vyaw = np.clip(vyaw, -MAX_ANGULAR_VEL, MAX_ANGULAR_VEL)
+
+            print(f"vyaw: {vyaw}, target_yaw: {target_yaw}, yaw_error: {yaw_error}")
+            self.cmd[2] = vyaw
 
         if torso_orientation_rpy is not None and self.use_teleop_policy_cmd:
             self.roll_cmd = torso_orientation_rpy[0]
