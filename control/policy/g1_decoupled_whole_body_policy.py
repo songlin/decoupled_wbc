@@ -27,6 +27,25 @@ class G1DecoupledWholeBodyPolicy(Policy):
         self.last_goal_time = time_module.monotonic()
         self.is_in_teleop_mode = False  # Track if lower body is in teleop mode
 
+    def reset(self, init_time=None):
+        """Reset both upper and lower body policies to initial state for a new episode.
+
+        Args:
+            init_time: Initial time for upper-body interpolation policy reset
+        """
+        if init_time is None:
+            init_time = time_module.monotonic()
+
+        # Reset upper-body interpolation policy
+        self.upper_body_policy.reset(init_time=init_time)
+
+        # Reset lower-body RL policy
+        self.lower_body_policy.reset()
+
+        # Reset teleop mode tracking
+        self.is_in_teleop_mode = False
+        self.last_goal_time = init_time
+
     def set_observation(self, observation):
         # Upper body policy is open loop (just interpolation), so we don't need to set the observation
         self.lower_body_policy.set_observation(observation)
@@ -143,9 +162,17 @@ class G1DecoupledWholeBodyPolicy(Policy):
             : len(lower_body_indices)
         ]  # lower body (legs + waist)
 
-        self.last_action = {"q": q}
+        self.last_action = {"q": q} # , "obs_tensor": lower_body_action["obs_tensor"]
 
-        return {"q": q}
+        return { # !!!=== everything is synced here ===!!!
+            "q": q, 
+            # "base_height_command": base_height_command, # 1 cycle delayed !
+            # "navigate_cmd": interpolated_navigate_cmd, # 1 cycle delayed !
+            "base_height_command": lower_body_action["base_height_command"], # synced
+            "navigate_cmd": lower_body_action["navigate_cmd"], # synced 
+            "torso_rpy_cmd": lower_body_action["torso_rpy_cmd"], # synced
+            "obs_tensor": lower_body_action["obs_tensor"] # synced
+        }
 
     def handle_keyboard_button(self, key):
         try:

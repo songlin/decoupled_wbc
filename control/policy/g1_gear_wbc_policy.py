@@ -51,8 +51,34 @@ class G1GearWbcPolicy(Policy):
         self.roll_cmd = self.config["rpy_cmd"][0]
         self.pitch_cmd = self.config["rpy_cmd"][1]
         self.yaw_cmd = self.config["rpy_cmd"][2]
+        self.target_yaw_cmd = 0
         self.gait_indices = torch.zeros((1), dtype=torch.float32)
         # self.control_dt = 1.0 / 50.0  # Control frequency at 50Hz
+
+    def reset(self):
+        """Reset all state variables to initial values for a new episode."""
+        # Observation history
+        self.observation = None
+        self.obs_history = collections.deque(maxlen=self.config["obs_history_len"])
+        self.obs_buffer[:] = 0
+        self.obs_tensor = None
+        self.counter = 0
+
+        # Action and policy state
+        self.action[:] = 0
+        # NOTE: do not reset use_policy_action — it's a persistent mode flag
+        self.target_dof_pos = self.config["default_angles"].copy()
+
+        # Command state (reset to defaults)
+        self.cmd = self.config["cmd_init"].copy()
+        self.height_cmd = self.config["height_cmd"]
+        self.freq_cmd = self.config["freq_cmd"]
+        self.roll_cmd = self.config["rpy_cmd"][0]
+        self.pitch_cmd = self.config["rpy_cmd"][1]
+        self.yaw_cmd = self.config["rpy_cmd"][2]
+        self.target_yaw_cmd = 0
+        # Gait state
+        self.gait_indices = torch.zeros((1), dtype=torch.float32)
 
     def load_onnx_policy(self, model_path: str):
         print(f"Loading ONNX policy from {model_path}")
@@ -132,8 +158,9 @@ class G1GearWbcPolicy(Policy):
         # single_obs[13 + 2 * n_joints + 15 : 13 + 2 * n_joints + 15 + 2] = (
         #     processed_clock_inputs.detach().cpu().numpy()
         # )
+        # print("---------------compute obs-----------------")
         return single_obs, single_obs_dim
-
+    
     def set_observation(self, observation: Dict[str, Any]):
         """Update the policy's current observation of the environment.
 
@@ -201,6 +228,13 @@ class G1GearWbcPolicy(Policy):
         Returns:
             Dictionary containing the action to be executed
         """
+        synced_base_height_command = (np.array([self.height_cmd], dtype=np.float32)
+                                      if self.height_cmd is float else base_height_command
+                                    )
+        
+        synced_navigate_cmd = np.concatenate([self.cmd.copy(), [self.target_yaw_cmd]])
+        synced_torso_rpy_cmd = np.array([self.roll_cmd, self.pitch_cmd, self.yaw_cmd], dtype=np.float32)
+
         if self.obs_tensor is None:
             raise ValueError("No observation set. Call set_observation() first.")
 
@@ -235,8 +269,9 @@ class G1GearWbcPolicy(Policy):
                 MAX_ANGULAR_VEL = 1.0  # rad/s (matches pico_streamer.py)
                 vyaw = np.clip(vyaw, -MAX_ANGULAR_VEL, MAX_ANGULAR_VEL)
 
-            print(f"vyaw: {vyaw}, target_yaw: {target_yaw}, yaw_error: {yaw_error}")
+            # print(f"vyaw: {vyaw}, target_yaw: {target_yaw}, yaw_error: {yaw_error}")
             self.cmd[2] = vyaw
+            self.target_yaw_cmd = target_yaw  # support target yaw control
 
         if torso_orientation_rpy is not None and self.use_teleop_policy_cmd:
             self.roll_cmd = torso_orientation_rpy[0]
@@ -246,7 +281,8 @@ class G1GearWbcPolicy(Policy):
         # Run policy inference
         with torch.no_grad():
             # Select appropriate policy based on command magnitude
-            if np.linalg.norm(self.cmd) < 0.05:
+            # if np.linalg.norm(self.cmd) < 0.05:
+            if np.linalg.norm(synced_navigate_cmd) < 0.05:
                 # Use standing policy for small commands
                 policy = self.policy_1
             else:
@@ -263,8 +299,14 @@ class G1GearWbcPolicy(Policy):
 
         cmd_dq = np.zeros(self.config["num_actions"])
         cmd_tau = np.zeros(self.config["num_actions"])
-
-        return {"body_action": (cmd_q, cmd_dq, cmd_tau)}
+        # print("---------------get action-----------------")
+        return {
+            "body_action": (cmd_q, cmd_dq, cmd_tau), 
+            "obs_tensor": self.obs_tensor,
+            "base_height_command": synced_base_height_command,
+            "navigate_cmd": synced_navigate_cmd,
+            "torso_rpy_cmd": synced_torso_rpy_cmd
+        }
 
     def handle_keyboard_button(self, key):
         if key == "]":

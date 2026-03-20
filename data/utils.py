@@ -155,6 +155,11 @@ def get_dataset_features(robot_model: RobotModel, add_stereo_camera: bool = Fals
             "shape": (6,),
             "names": ["lin_vel_x", "lin_vel_y", "lin_vel_z", "ang_vel_x", "ang_vel_y", "ang_vel_z"],
         },
+        # "observation.torso_rpy_command": {
+        #     "dtype": "float64",
+        #     "shape": (3,),
+        #     "names": ["roll", "pitch", "yaw"],
+        # },
     }
     if add_stereo_camera:
         dataset_features.update(
