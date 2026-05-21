@@ -128,14 +128,17 @@ class G1DecoupledWholeBodyPolicy(Policy):
                 )  # This will reset is_in_teleop_mode to False and trigger all safety
 
         # Get indices for groups
-        lower_body_indices = self.robot_model.get_joint_group_indices("lower_body")
-        upper_body_indices = self.robot_model.get_joint_group_indices("upper_body")
+        lower_body_indices = self.robot_model.get_joint_group_indices("lower_body") # [0~14]
+        upper_body_indices = self.robot_model.get_joint_group_indices("upper_body") # [12-42]
 
         # Initialize full configuration with zeros
         q = np.zeros(self.robot_model.num_dofs)
 
         upper_body_action = self.upper_body_policy.get_action(time)
-        q[upper_body_indices] = upper_body_action["target_upper_body_pose"]
+        q[upper_body_indices] = upper_body_action["target_upper_body_pose"] # include 3 waist joints
+
+        target_waist = q[upper_body_indices[:3]] # the input to lowerbody RL
+
         q_arms = q[self.robot_model.get_joint_group_indices("arms")]
         base_height_command = upper_body_action.get("base_height_command", None)
         interpolated_navigate_cmd = upper_body_action.get("navigate_cmd", None)
@@ -168,6 +171,7 @@ class G1DecoupledWholeBodyPolicy(Policy):
             "q": q, 
             # "base_height_command": base_height_command, # 1 cycle delayed !
             # "navigate_cmd": interpolated_navigate_cmd, # 1 cycle delayed !
+            "target_waist": target_waist, # input waist from IK
             "base_height_command": lower_body_action["base_height_command"], # synced
             "navigate_cmd": lower_body_action["navigate_cmd"], # synced 
             "torso_rpy_cmd": lower_body_action["torso_rpy_cmd"], # synced
