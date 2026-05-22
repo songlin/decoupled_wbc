@@ -282,7 +282,7 @@ class G1GearWbcPolicy(Policy):
         with torch.no_grad():
             # Select appropriate policy based on command magnitude
             # if np.linalg.norm(self.cmd) < 0.05:
-            if np.linalg.norm(synced_navigate_cmd) < 0.05:
+            if np.linalg.norm(synced_navigate_cmd[:3]) < 0.05  or np.abs(vyaw_flag) < 0.1:
                 # Use standing policy for small commands
                 policy = self.policy_1
             else:
