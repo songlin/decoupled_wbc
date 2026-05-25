@@ -285,7 +285,7 @@ class G1GearWbcPolicy(Policy):
             # Select appropriate policy based on command magnitude:
             # apply a small dead zone for (vx,vy,vyaw) and the remote control of rotation is not triggered
             # it is safer during inference when policy outputs a noisy vyaw.
-            if np.linalg.norm(synced_navigate_cmd[:3]) < 0.05 or np.abs(vyaw_flag) < 0.1:
+            if np.linalg.norm(synced_navigate_cmd[:2]) < 0.05 and np.abs(vyaw_flag) < 0.1:
                 # Use standing policy for small commands
                 policy = self.policy_1
             else:
