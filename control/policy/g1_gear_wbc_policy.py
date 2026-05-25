@@ -272,6 +272,8 @@ class G1GearWbcPolicy(Policy):
             # print(f"vyaw: {vyaw}, target_yaw: {target_yaw}, yaw_error: {yaw_error}")
             self.cmd[2] = vyaw
             self.target_yaw_cmd = target_yaw  # support target yaw control
+        else:
+            vyaw_flag = 0.
 
         if torso_orientation_rpy is not None and self.use_teleop_policy_cmd:
             self.roll_cmd = torso_orientation_rpy[0]
@@ -280,9 +282,10 @@ class G1GearWbcPolicy(Policy):
 
         # Run policy inference
         with torch.no_grad():
-            # Select appropriate policy based on command magnitude
-            # if np.linalg.norm(self.cmd) < 0.05:
-            if np.linalg.norm(synced_navigate_cmd[:3]) < 0.05  or np.abs(vyaw_flag) < 0.1:
+            # Select appropriate policy based on command magnitude:
+            # apply a small dead zone for (vx,vy,vyaw) and the remote control of rotation is not triggered
+            # it is safer during inference when policy outputs a noisy vyaw.
+            if np.linalg.norm(synced_navigate_cmd[:3]) < 0.05 or np.abs(vyaw_flag) < 0.1:
                 # Use standing policy for small commands
                 policy = self.policy_1
             else:
@@ -299,12 +302,16 @@ class G1GearWbcPolicy(Policy):
 
         cmd_dq = np.zeros(self.config["num_actions"])
         cmd_tau = np.zeros(self.config["num_actions"])
-        # print("---------------get action-----------------")
+        
+        # NOTE return the "vyaw flag" instead of the "derivative vyaw" in the navigate cmd
+        # the turning behavior is "doublely controled" with vyaw_flag and target_yaw:
+        # when target_yaw is not reached the robot keeps turning until vyaw_flag is set (no matter if target_yaw is reached.)
+        # because target_yaw alone can not guarantee steady control due to sensor error and the highly dynamic nature of wholebody control
         return {
-            "body_action": (cmd_q, cmd_dq, cmd_tau), 
+            "body_action": (cmd_q, cmd_dq, cmd_tau),
             "obs_tensor": self.obs_tensor,
             "base_height_command": synced_base_height_command,
-            "navigate_cmd": synced_navigate_cmd,
+            "navigate_cmd": np.concatenate([synced_navigate_cmd[:2], [vyaw_flag], synced_navigate_cmd[3:4]]),
             "torso_rpy_cmd": synced_torso_rpy_cmd
         }
 
