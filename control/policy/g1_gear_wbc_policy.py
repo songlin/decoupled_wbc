@@ -1,7 +1,7 @@
 import collections
 from pathlib import Path
 from typing import Any, Dict, Optional
-
+import os
 import numpy as np
 import onnxruntime as ort
 import torch
@@ -285,7 +285,15 @@ class G1GearWbcPolicy(Policy):
             # Select appropriate policy based on command magnitude:
             # apply a small dead zone for (vx,vy,vyaw) and the remote control of rotation is not triggered
             # it is safer during inference when policy outputs a noisy vyaw.
-            if np.linalg.norm(synced_navigate_cmd[:2]) < 0.05 and np.abs(vyaw_flag) < 0.1:
+            if os.environ.get("MODIFIED_POLICY_SWITCH_BEHAVIOR", "0").lower() in ("1", "true"):
+                switch_cond = (
+                    np.linalg.norm(synced_navigate_cmd[:2]) < 0.05
+                    and np.abs(vyaw_flag) < 0.1
+                )
+            else:
+                switch_cond = np.linalg.norm(synced_navigate_cmd[:3]) < 0.05
+            
+            if switch_cond:
                 # Use standing policy for small commands
                 policy = self.policy_1
             else:
