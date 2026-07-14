@@ -291,7 +291,7 @@ class G1GearWbcPolicy(Policy):
                     and np.abs(vyaw_flag) < 0.1
                 )
             else:
-                switch_cond = np.linalg.norm(synced_navigate_cmd[:3]) < 0.05
+                switch_cond = np.linalg.norm(np.concatenate([synced_navigate_cmd[:2], [vyaw_flag]])) < 0.1
             
             if switch_cond:
                 # Use standing policy for small commands
