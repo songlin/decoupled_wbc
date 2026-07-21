@@ -261,7 +261,7 @@ class G1GearWbcPolicy(Policy):
 
             # Dead zone: if error is small enough, stop correcting
             YAW_ERROR_THRESHOLD = 0.01  # ~0.57 degrees
-            if abs(yaw_error) < YAW_ERROR_THRESHOLD : # or abs(vyaw_flag) == 0.0
+            if abs(yaw_error) < YAW_ERROR_THRESHOLD or np.abs(vyaw_flag) < 0.1: # or abs(vyaw_flag) == 0.0
                 vyaw = 0.0
             else:
                 vyaw = yaw_error / 0.5  # convert error to rate
