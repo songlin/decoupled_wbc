@@ -2,7 +2,6 @@ import os
 import queue
 import sys
 import threading
-import time
 
 import av
 import numpy as np
@@ -31,8 +30,8 @@ class VideoWriter:
         self.stream = self.container.add_stream(codec, rate=fps)
         self.stream.width = width
         self.stream.height = height
-        thread = threading.Thread(target=self._writer_worker, daemon=True)
-        thread.start()
+        self._thread = threading.Thread(target=self._writer_worker, daemon=True)
+        self._thread.start()
 
     def _assert_dimensions(self, frame: np.ndarray) -> None:
         assert (
@@ -47,8 +46,8 @@ class VideoWriter:
     def _writer_worker(self) -> None:
         while True:
             frame = self.queue.get()
-            if frame is None:
-                continue
+            if frame is None:  # stop() sentinel
+                break
             self._assert_dimensions(frame)
             frame = av.VideoFrame.from_ndarray(frame, format="rgb24")
 
@@ -82,10 +81,10 @@ class VideoWriter:
         Blocking call. Waits until all the frames in the queue have been written to the file
         and the video writer has been closed.
         """
-        if not self.queue.empty():
-            print("Waiting for video writer queue to empty...")
-            while not self.queue.empty():
-                time.sleep(0.1)
+        # Join the worker before flushing: an empty queue doesn't mean the last frame is
+        # encoded, and encoding from both threads at once can deadlock the encoder.
+        self.queue.put(None)
+        self._thread.join()
 
         print("Video writer queue is empty, flushing stream...")
         self._flush_stream()
